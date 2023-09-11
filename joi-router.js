@@ -237,7 +237,7 @@ function checkValidators(spec) {
   let text;
   if (spec.validate.body) {
     text = 'validate.type must be declared when using validate.body';
-    assert(/json|form/.test(spec.validate.type), text);
+    assert(/json|form|multipart/.test(spec.validate.type), text);
   }
 
   if (spec.validate.type) {
@@ -349,11 +349,23 @@ function makeMultipartParser(spec) {
   if (typeof opts.autoFields === 'undefined') {
     opts.autoFields = true;
   }
+  // opts.autoFields = true;
   return async function parseMultipart(ctx) {
     if (!ctx.request.is('multipart/*')) {
       return ctx.throw(400, 'expected multipart');
     }
     ctx.request.parts = busboy(ctx, opts);
+    // const files = [];
+    // try {
+    //   let part
+    //   while ((part = await parts)) {
+    //     files.push(part);
+    //     // it's a stream
+    //     // part.pipe(fs.createWriteStream('some file.txt'))
+    //   }
+    // } catch (err) {
+    //   return ctx.throw(500, 'failed to read file')
+    // }
   };
 }
 
@@ -401,7 +413,10 @@ function captureError(ctx, type, err) {
  */
 
 function makeValidator(spec) {
-  const props = 'header query params body'.split(' ');
+  const props = 'header query params'.split(' ');
+  if (!/multipart/.test(spec.validate.type)) { // don't validate body for multipart
+    props.push('body');;
+  }
 
   return async function validator(ctx, next) {
     if (!spec.validate) return await next();
