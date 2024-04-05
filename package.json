@@ -31,6 +31,7 @@
   },
   "homepage": "https://github.com/koajs/joi-router",
   "dependencies": {
+    "@koa/multer": "^3.0.2",
     "@koa/router": "^10.0.0",
     "await-busboy": "1.0.3",
     "clone": "2.1.2",
@@ -41,6 +42,7 @@
     "is-gen-fn": "0.0.1",
     "joi": "^17.2.1",
     "methods": "1.1.2",
+    "multer": "^1.4.5-lts.1",
     "sliced": "1.0.1"
   },
   "devDependencies": {

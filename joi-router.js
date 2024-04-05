@@ -7,6 +7,8 @@ const flatten = require('flatten');
 const methods = require('methods');
 const KoaRouter = require('@koa/router');
 const busboy = require('await-busboy');
+const multer = require('@koa/multer');
+const appendField = require('append-field');
 const parse = require('co-body');
 const Joi = require('joi');
 const slice = require('sliced');
@@ -268,6 +270,18 @@ async function noopMiddleware(ctx, next) {
 }
 
 /**
+ * Does literally nothing
+ */
+function noop() {}
+
+/**
+ * Identity function
+ */
+function idop(arg) {
+  return arg;
+}
+
+/**
  * Handles parser internal errors
  * @param  {Object} spec         [description]
  * @param  {function} parsePayload [description]
@@ -346,26 +360,32 @@ function makeFormBodyParser(spec) {
 
 function makeMultipartParser(spec) {
   const opts = spec.validate.multipartOptions || {};
-  if (typeof opts.autoFields === 'undefined') {
-    opts.autoFields = true;
+  let parse;
+  if (opts.useBusboy) {
+    if (typeof opts.autoFields === 'undefined') {
+      opts.autoFields = true;
+    }
+    parse = async (ctx) => {
+      ctx.request.parts = busboy(ctx, opts);
+    };
+  } else {
+    if (typeof opts.fileToField === 'undefined') {
+      opts.fileToField = idop;
+    }
+    const upload = multer(opts);
+    parse = async (ctx) => {
+      await upload.any()(ctx, noop);
+      for (const file of ctx.files) {
+        appendField(ctx.request.body, file.fieldname, opts.fileToField(file));
+      }
+    }
   }
-  // opts.autoFields = true;
-  return async function parseMultipart(ctx) {
+
+  return async function parseMultipart(ctx, next) {
     if (!ctx.request.is('multipart/*')) {
       return ctx.throw(400, 'expected multipart');
     }
-    ctx.request.parts = busboy(ctx, opts);
-    // const files = [];
-    // try {
-    //   let part
-    //   while ((part = await parts)) {
-    //     files.push(part);
-    //     // it's a stream
-    //     // part.pipe(fs.createWriteStream('some file.txt'))
-    //   }
-    // } catch (err) {
-    //   return ctx.throw(500, 'failed to read file')
-    // }
+    await parse(ctx);
   };
 }
 
@@ -414,7 +434,7 @@ function captureError(ctx, type, err) {
 
 function makeValidator(spec) {
   const props = 'header query params'.split(' ');
-  if (!/multipart/.test(spec.validate.type)) { // don't validate body for multipart
+  if (!/multipart/.test(spec.validate.type) || !(spec.validate.multipartOptions || {}).useBusboy) { // don't validate body for multipart
     props.push('body');;
   }
 
